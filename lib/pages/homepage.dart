@@ -1,3 +1,4 @@
+import 'package:checklist/pages/addtaskpage.dart';
 import 'package:checklist/util/navbar.dart';
 import 'package:flutter/material.dart';
 
@@ -12,22 +13,34 @@ class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
 
   void _onTabSelected(int index) {
+    if (index == 4) {
+      Navigator.of(context, rootNavigator: true).push(
+        MaterialPageRoute(
+          builder: (context) => const AddTaskPage(),
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _selectedIndex = index;
     });
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey,
       body: Center(
-        child: Text("Home Page - Selected Index: $_selectedIndex",
-          style: TextStyle(fontSize: 24),
+        child: Text(
+          "Home Page - Selected Index: $_selectedIndex",
+          style: const TextStyle(fontSize: 24),
         ),
-    ),
-        bottomNavigationBar: LiquidGlassNavbar(
-            selectedIndex: _selectedIndex,
-            onTabSelected: _onTabSelected)
-      );
+      ),
+      bottomNavigationBar: LiquidGlassNavbar(
+        selectedIndex: _selectedIndex,
+        onTabSelected: _onTabSelected,
+      ),
+    );
   }
 }
