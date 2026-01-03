@@ -50,7 +50,7 @@ class LiquidGlassNavbar extends StatelessWidget {
                   // Notification Icon
                   _buildNavIcon(
                     icon: Icons.analytics,
-                    index: 2,
+                    index: 1,
                     label: 'Notifications',
                   ),
 
