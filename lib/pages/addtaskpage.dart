@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-
-enum Priority { high, medium, low }
+import 'package:intl/intl.dart';
+import 'package:checklist/util/task.dart';
 
 class AddTaskPage extends StatefulWidget {
-  const AddTaskPage({super.key});
+  final bool isDarkMode;
+
+  const AddTaskPage({super.key, this.isDarkMode = false});
 
   @override
   State<AddTaskPage> createState() => _AddTaskPageState();
@@ -11,6 +13,7 @@ class AddTaskPage extends StatefulWidget {
 
 class _AddTaskPageState extends State<AddTaskPage> {
   Priority _priority = Priority.medium;
+  DateTime _selectedDate = DateTime.now();
 
   final List<String> _lists = [
     "Work",
@@ -18,264 +21,318 @@ class _AddTaskPageState extends State<AddTaskPage> {
     "Health",
     "Shopping",
     "Study",
-    "Finance",
-    "Travel",
   ];
 
   String? _selectedList;
-  final TextEditingController _listController = TextEditingController();
 
-  static const double pillWidth = 120;
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
+    // Theme colors
+    final backgroundColor = widget.isDarkMode ? const Color(0xFF1A1A1A) : Colors.white;
+    final textColor = widget.isDarkMode ? Colors.white : Colors.black;
+    final cardColor = widget.isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey[50];
+    final borderColor = widget.isDarkMode ? Colors.grey[700]! : Colors.grey.shade200;
+    final hintColor = widget.isDarkMode ? Colors.grey[500] : Colors.grey[400];
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: backgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
         elevation: 0,
+        backgroundColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.black),
-          onPressed: () {
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            }
-          },
+          icon: Icon(Icons.close, color: textColor),
+          onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "What needs to be done?",
-              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              "Add details, notes, or subtasks...",
-              style: TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 20),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 8),
 
-            TextField(
-              maxLines: 2,
-              decoration: InputDecoration(
-                hintText: "Enter task...",
-                filled: true,
-                fillColor: Colors.grey[100],
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
+              Text(
+                "What do you want to do?",
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  height: 1.2,
+                  color: textColor,
                 ),
               ),
-            ),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 32),
 
-            TextField(
-              maxLines: 4,
-              decoration: InputDecoration(
-                hintText: "Description...",
-                filled: true,
-                fillColor: Colors.grey[100],
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
+              TextField(
+                controller: _titleController,
+                maxLines: 2,
+                style: TextStyle(fontSize: 16, color: textColor),
+                decoration: _inputDecoration(
+                  "Enter task...",
+                  cardColor,
+                  borderColor,
+                  hintColor,
+                  textColor,
                 ),
               ),
-            ),
 
-            const Spacer(),
+              const SizedBox(height: 16),
 
-            Row(
-              children: [
-                _pill(Icons.calendar_today, "Today"),
-                const SizedBox(width: 10),
-                _listDropdown(),
-                const SizedBox(width: 10),
-                _priorityDropdown(),
-              ],
-            ),
+              TextField(
+                controller: _descriptionController,
+                maxLines: 4,
+                style: TextStyle(fontSize: 15, color: textColor),
+                decoration: _inputDecoration(
+                  "Description...",
+                  cardColor,
+                  borderColor,
+                  hintColor,
+                  textColor,
+                ),
+              ),
 
-            const SizedBox(height: 24),
+              const Spacer(),
 
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.black,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+              // Pills row with proper spacing
+              Row(
+                children: [
+                  _datePill(textColor, borderColor, cardColor),
+                  const SizedBox(width: 12),
+                  Expanded(child: _listDropdown(textColor, borderColor, cardColor)),
+                  const SizedBox(width: 12),
+                  _priorityDropdown(textColor, borderColor, cardColor),
+                ],
+              ),
+
+              const SizedBox(height: 24),
+
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: widget.isDarkMode ? Colors.white : Colors.black,
+                    foregroundColor: widget.isDarkMode ? Colors.black : Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  onPressed: _createTask,
+                  child: const Text(
+                    "Create Task",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-                onPressed: () {
-                  if (Navigator.canPop(context)) {
-                    Navigator.pop(context);
-                  }
-                },
-                child: const Text("Create Task"),
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
-  Widget _pill(IconData icon, String text) {
-    return SizedBox(
-      width: pillWidth,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(30),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 16),
-            const SizedBox(width: 6),
-            Text(text),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// LIST DROPDOWN
-  Widget _listDropdown() {
-    return SizedBox(
-      width: pillWidth,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-        decoration: BoxDecoration(
-          color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(30),
-        ),
-        child: DropdownButtonHideUnderline(
-          child: DropdownButton<String>(
-            hint: const Text("No List"),
-            value: _selectedList,
-            isExpanded: true,
-            items: [
-              ..._lists.map(
-                    (list) => DropdownMenuItem(
-                  value: list,
-                  child: Text(list),
-                ),
-              ),
-              const DropdownMenuItem(
-                value: "__add__",
-                child: Text("+ Add New"),
-              ),
+              const SizedBox(height: 24),
             ],
-            onChanged: (value) {
-              if (value == "__add__") {
-                _showAddListDialog();
-              } else {
-                setState(() => _selectedList = value);
-              }
-            },
           ),
         ),
       ),
     );
   }
 
-  void _showAddListDialog() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text("Add New List"),
-          content: TextField(
-            controller: _listController,
-            decoration: const InputDecoration(hintText: "List name"),
+  void _createTask() {
+    if (_titleController.text.trim().isEmpty) return;
+
+    final task = Task(
+      title: _titleController.text.trim(),
+      description: _descriptionController.text.trim(),
+      list: _selectedList,
+      priority: _priority,
+      dueDate: _dateOnly(_selectedDate),
+    );
+
+    Navigator.pop(context, task);
+  }
+
+  DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  InputDecoration _inputDecoration(
+      String hint,
+      Color? fillColor,
+      Color borderColor,
+      Color? hintColor,
+      Color textColor,
+      ) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(color: hintColor),
+      filled: true,
+      fillColor: fillColor,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: borderColor),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: borderColor),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(
+          color: widget.isDarkMode ? Colors.white : Colors.black,
+          width: 1.5,
+        ),
+      ),
+    );
+  }
+
+  Widget _pill({
+    required Widget child,
+    VoidCallback? onTap,
+    required Color bgColor,
+    required Color borderColor,
+    double? width,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: width,
+        height: 48,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: borderColor, width: 1),
+        ),
+        child: child,
+      ),
+    );
+  }
+
+  Widget _datePill(Color textColor, Color borderColor, Color? bgColor) {
+    return _pill(
+      width: 120,
+      onTap: _pickDate,
+      bgColor: bgColor!,
+      borderColor: borderColor,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.calendar_today, size: 16, color: textColor),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              _dateLabel(),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: textColor,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                _listController.clear();
-                Navigator.pop(context);
-              },
-              child: const Text("Cancel"),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: widget.isDarkMode ? Colors.white : Colors.black,
+              surface: widget.isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
+              onSurface: widget.isDarkMode ? Colors.white : Colors.black,
             ),
-            ElevatedButton(
-              onPressed: () {
-                final name = _listController.text.trim();
-                if (name.isNotEmpty) {
-                  setState(() {
-                    _lists.add(name);
-                    _selectedList = name;
-                  });
-                }
-                _listController.clear();
-                Navigator.pop(context);
-              },
-              child: const Text("Add"),
-            ),
-          ],
+            dialogBackgroundColor: widget.isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
+          ),
+          child: child!,
         );
       },
     );
+
+    if (picked != null) setState(() => _selectedDate = picked);
   }
 
-  /// PRIORITY DROPDOWN
-  Widget _priorityDropdown() {
-    return SizedBox(
-      width: pillWidth,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-        decoration: BoxDecoration(
-          color: _priorityColor().withOpacity(0.15),
-          borderRadius: BorderRadius.circular(30),
-        ),
-        child: DropdownButtonHideUnderline(
-          child: DropdownButton<Priority>(
-            value: _priority,
-            isExpanded: true,
-            items: const [
-              DropdownMenuItem(
-                value: Priority.high,
-                child: Text("High"),
-              ),
-              DropdownMenuItem(
-                value: Priority.medium,
-                child: Text("Medium"),
-              ),
-              DropdownMenuItem(
-                value: Priority.low,
-                child: Text("Low"),
-              ),
-            ],
-            onChanged: (value) {
-              if (value != null) {
-                setState(() => _priority = value);
-              }
-            },
+  String _dateLabel() {
+    final today = _dateOnly(DateTime.now());
+    final tomorrow = today.add(const Duration(days: 1));
+
+    if (_selectedDate == today) return "Today";
+    if (_selectedDate == tomorrow) return "Tomorrow";
+
+    return DateFormat("MMM d").format(_selectedDate);
+  }
+
+  Widget _listDropdown(Color textColor, Color borderColor, Color? bgColor) {
+    return _pill(
+      bgColor: bgColor!,
+      borderColor: borderColor,
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _selectedList,
+          hint: Text(
+            "No List",
             style: TextStyle(
-              color: _priorityColor(),
-              fontWeight: FontWeight.w600,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: textColor,
             ),
           ),
+          icon: Icon(Icons.arrow_drop_down, color: textColor),
+          isExpanded: true,
+          dropdownColor: widget.isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: textColor,
+          ),
+          items: _lists
+              .map((l) => DropdownMenuItem(
+            value: l,
+            child: Text(l),
+          ))
+              .toList(),
+          onChanged: (v) => setState(() => _selectedList = v),
         ),
       ),
     );
   }
 
-  Color _priorityColor() {
-    switch (_priority) {
-      case Priority.high:
-        return Colors.red;
-      case Priority.medium:
-        return Colors.orange;
-      case Priority.low:
-        return Colors.teal;
-    }
+  Widget _priorityDropdown(Color textColor, Color borderColor, Color? bgColor) {
+    return _pill(
+      width: 110,
+      bgColor: bgColor!,
+      borderColor: borderColor,
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<Priority>(
+          value: _priority,
+          icon: Icon(Icons.arrow_drop_down, color: textColor),
+          isExpanded: true,
+          dropdownColor: widget.isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: textColor,
+          ),
+          items: const [
+            DropdownMenuItem(value: Priority.high, child: Text("High")),
+            DropdownMenuItem(value: Priority.medium, child: Text("Medium")),
+            DropdownMenuItem(value: Priority.low, child: Text("Low")),
+          ],
+          onChanged: (v) => setState(() => _priority = v!),
+        ),
+      ),
+    );
   }
 }
