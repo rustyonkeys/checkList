@@ -20,9 +20,8 @@ class CustomNavbar extends StatelessWidget {
     final textColor = isDarkMode ? Colors.white : Colors.black;
     final subtleTextColor = isDarkMode ? Colors.grey[400] : Colors.grey[600];
     final selectedColor = isDarkMode ? Colors.white : Colors.black;
-    final selectedBgColor = isDarkMode
-        ? Colors.white.withOpacity(0.1)
-        : Colors.black.withOpacity(0.05);
+    final selectedBgColor =
+        isDarkMode ? Colors.white.withAlpha(26) : Colors.black.withAlpha(13);
 
     return Drawer(
       backgroundColor: backgroundColor,
@@ -42,9 +41,16 @@ class CustomNavbar extends StatelessWidget {
                         height: 50,
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
-                            colors: isDarkMode
-                                ? [Colors.deepPurple.shade700, Colors.deepPurple.shade500]
-                                : [Colors.orange.shade800, Colors.orange.shade600],
+                            colors:
+                                isDarkMode
+                                    ? [
+                                      Colors.deepPurple.shade700,
+                                      Colors.deepPurple.shade500,
+                                    ]
+                                    : [
+                                      Colors.orange.shade800,
+                                      Colors.orange.shade600,
+                                    ],
                           ),
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -138,7 +144,10 @@ class CustomNavbar extends StatelessWidget {
                   const SizedBox(height: 16),
 
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     child: Text(
                       'SETTINGS',
                       style: TextStyle(
@@ -222,10 +231,7 @@ class CustomNavbar extends StatelessWidget {
 
                   Text(
                     'Version 1.0.0',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: subtleTextColor,
-                    ),
+                    style: TextStyle(fontSize: 12, color: subtleTextColor),
                   ),
                 ],
               ),
@@ -261,7 +267,7 @@ class CustomNavbar extends StatelessWidget {
             children: [
               Icon(
                 isSelected ? selectedIcon : icon,
-                color: isSelected ? selectedColor : textColor.withOpacity(0.7),
+                color: isSelected ? selectedColor : textColor.withAlpha(179),
                 size: 24,
               ),
               const SizedBox(width: 16),
@@ -270,7 +276,7 @@ class CustomNavbar extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                  color: isSelected ? selectedColor : textColor.withOpacity(0.7),
+                  color: isSelected ? selectedColor : textColor.withAlpha(179),
                 ),
               ),
             ],

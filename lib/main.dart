@@ -1,5 +1,3 @@
-import 'package:checklist/pages/addtaskpage.dart';
-import 'package:checklist/pages/analytic%20page.dart';
 import 'package:checklist/pages/homepage.dart';
 import 'package:flutter/material.dart';
 
@@ -18,4 +16,3 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-

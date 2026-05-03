@@ -4,8 +4,17 @@ import 'package:checklist/util/task.dart';
 
 class AddTaskPage extends StatefulWidget {
   final bool isDarkMode;
+  final List<String> categories;
+  final Priority defaultPriority;
+  final Task? existingTask;
 
-  const AddTaskPage({super.key, this.isDarkMode = false});
+  const AddTaskPage({
+    super.key,
+    this.isDarkMode = false,
+    required this.categories,
+    this.defaultPriority = Priority.medium,
+    this.existingTask,
+  });
 
   @override
   State<AddTaskPage> createState() => _AddTaskPageState();
@@ -14,16 +23,19 @@ class AddTaskPage extends StatefulWidget {
 class _AddTaskPageState extends State<AddTaskPage> {
   Priority _priority = Priority.medium;
   DateTime _selectedDate = DateTime.now();
-
-  final List<String> _lists = [
-    "Work",
-    "Personal",
-    "Health",
-    "Shopping",
-    "Study",
-  ];
-
   String? _selectedList;
+
+  @override
+  void initState() {
+    super.initState();
+    _priority = widget.existingTask?.priority ?? widget.defaultPriority;
+    _selectedDate = widget.existingTask?.dueDate ?? DateTime.now();
+    _selectedList =
+        widget.existingTask?.list ??
+        (widget.categories.isNotEmpty ? widget.categories.first : null);
+    _titleController.text = widget.existingTask?.title ?? '';
+    _descriptionController.text = widget.existingTask?.description ?? '';
+  }
 
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
@@ -31,10 +43,13 @@ class _AddTaskPageState extends State<AddTaskPage> {
   @override
   Widget build(BuildContext context) {
     // Theme colors
-    final backgroundColor = widget.isDarkMode ? const Color(0xFF1A1A1A) : Colors.white;
+    final backgroundColor =
+        widget.isDarkMode ? const Color(0xFF1A1A1A) : Colors.white;
     final textColor = widget.isDarkMode ? Colors.white : Colors.black;
-    final cardColor = widget.isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey[50];
-    final borderColor = widget.isDarkMode ? Colors.grey[700]! : Colors.grey.shade200;
+    final cardColor =
+        widget.isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey[50];
+    final borderColor =
+        widget.isDarkMode ? Colors.grey[700]! : Colors.grey.shade200;
     final hintColor = widget.isDarkMode ? Colors.grey[500] : Colors.grey[400];
 
     return Scaffold(
@@ -102,11 +117,22 @@ class _AddTaskPageState extends State<AddTaskPage> {
                 children: [
                   _datePill(textColor, borderColor, cardColor),
                   const SizedBox(width: 12),
-                  Expanded(child: _listDropdown(textColor, borderColor, cardColor)),
+                  Expanded(
+                    child: _listDropdown(textColor, borderColor, cardColor),
+                  ),
                   const SizedBox(width: 12),
                   _priorityDropdown(textColor, borderColor, cardColor),
                 ],
               ),
+
+              if (widget.categories.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12, left: 4),
+                  child: Text(
+                    'Need more categories? Open the Categories page and add one here.',
+                    style: TextStyle(color: hintColor, fontSize: 13),
+                  ),
+                ),
 
               const SizedBox(height: 24),
 
@@ -115,17 +141,19 @@ class _AddTaskPageState extends State<AddTaskPage> {
                 height: 56,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: widget.isDarkMode ? Colors.white : Colors.black,
-                    foregroundColor: widget.isDarkMode ? Colors.black : Colors.white,
+                    backgroundColor:
+                        widget.isDarkMode ? Colors.white : Colors.black,
+                    foregroundColor:
+                        widget.isDarkMode ? Colors.black : Colors.white,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
                   onPressed: _createTask,
-                  child: const Text(
-                    "Create Task",
-                    style: TextStyle(
+                  child: Text(
+                    widget.existingTask != null ? 'Save Task' : 'Create Task',
+                    style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),
@@ -145,11 +173,17 @@ class _AddTaskPageState extends State<AddTaskPage> {
     if (_titleController.text.trim().isEmpty) return;
 
     final task = Task(
+      id:
+          widget.existingTask?.id ??
+          DateTime.now().microsecondsSinceEpoch.toString(),
       title: _titleController.text.trim(),
       description: _descriptionController.text.trim(),
       list: _selectedList,
       priority: _priority,
       dueDate: _dateOnly(_selectedDate),
+      createdAt: widget.existingTask?.createdAt ?? DateTime.now(),
+      isDone: widget.existingTask?.isDone ?? false,
+      completedAt: widget.existingTask?.completedAt,
     );
 
     Navigator.pop(context, task);
@@ -158,12 +192,12 @@ class _AddTaskPageState extends State<AddTaskPage> {
   DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
   InputDecoration _inputDecoration(
-      String hint,
-      Color? fillColor,
-      Color borderColor,
-      Color? hintColor,
-      Color textColor,
-      ) {
+    String hint,
+    Color? fillColor,
+    Color borderColor,
+    Color? hintColor,
+    Color textColor,
+  ) {
     return InputDecoration(
       hintText: hint,
       hintStyle: TextStyle(color: hintColor),
@@ -251,10 +285,14 @@ class _AddTaskPageState extends State<AddTaskPage> {
           data: Theme.of(context).copyWith(
             colorScheme: ColorScheme.light(
               primary: widget.isDarkMode ? Colors.white : Colors.black,
-              surface: widget.isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
+              surface:
+                  widget.isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
               onSurface: widget.isDarkMode ? Colors.white : Colors.black,
             ),
-            dialogBackgroundColor: widget.isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
+            dialogTheme: DialogTheme(
+              backgroundColor:
+                  widget.isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
+            ),
           ),
           child: child!,
         );
@@ -291,18 +329,17 @@ class _AddTaskPageState extends State<AddTaskPage> {
           ),
           icon: Icon(Icons.arrow_drop_down, color: textColor),
           isExpanded: true,
-          dropdownColor: widget.isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
+          dropdownColor:
+              widget.isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
             color: textColor,
           ),
-          items: _lists
-              .map((l) => DropdownMenuItem(
-            value: l,
-            child: Text(l),
-          ))
-              .toList(),
+          items:
+              widget.categories
+                  .map((l) => DropdownMenuItem(value: l, child: Text(l)))
+                  .toList(),
           onChanged: (v) => setState(() => _selectedList = v),
         ),
       ),
@@ -319,7 +356,8 @@ class _AddTaskPageState extends State<AddTaskPage> {
           value: _priority,
           icon: Icon(Icons.arrow_drop_down, color: textColor),
           isExpanded: true,
-          dropdownColor: widget.isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
+          dropdownColor:
+              widget.isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
