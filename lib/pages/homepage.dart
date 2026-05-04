@@ -75,7 +75,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   Future<void> _saveTasks() async {
     await LocalStorage.saveTasks(_tasks);
-    await NotificationService.scheduleTaskNudges(_tasks);
+    await NotificationService.scheduleTaskNudges(_tasks, _preferences);
   }
 
   Future<void> _saveInboxBlocks() async {
@@ -88,6 +88,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   Future<void> _savePreferences() async {
     await LocalStorage.savePreferences(_preferences);
+    await NotificationService.scheduleTaskNudges(_tasks, _preferences);
   }
 
   List<Task> _removeOldCompletedTasks(List<Task> tasks, int days) {
@@ -130,7 +131,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   Future<void> _refreshReminderState() async {
-    await NotificationService.scheduleTaskNudges(_tasks);
+    await NotificationService.scheduleTaskNudges(_tasks, _preferences);
     await _maybeShowYesterdayPrompt();
     await NotificationService.markAppOpened();
   }

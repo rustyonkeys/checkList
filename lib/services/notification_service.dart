@@ -1,3 +1,4 @@
+import 'package:checklist/services/local_storage.dart';
 import 'package:checklist/util/task.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,15 +13,6 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   static bool _initialized = false;
-
-  static const AndroidNotificationDetails _androidDetails =
-      AndroidNotificationDetails(
-        'task_reminders',
-        'Task reminders',
-        channelDescription: 'Funny nudges and overdue task reminders',
-        importance: Importance.high,
-        priority: Priority.high,
-      );
 
   static Future<void> initialize() async {
     if (_initialized) return;
@@ -52,9 +44,14 @@ class NotificationService {
     return DateTime.tryParse(value);
   }
 
-  static Future<void> scheduleTaskNudges(List<Task> tasks) async {
+  static Future<void> scheduleTaskNudges(
+    List<Task> tasks,
+    AppPreferences preferences,
+  ) async {
     await initialize();
     await cancelTaskNudges();
+
+    if (!preferences.notificationsEnabled) return;
 
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -98,7 +95,9 @@ class NotificationService {
         messages[i].title,
         messages[i].body,
         scheduled,
-        const NotificationDetails(android: _androidDetails),
+        NotificationDetails(
+          android: _androidDetailsFor(preferences),
+        ),
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
@@ -114,6 +113,24 @@ class NotificationService {
 
   static DateTime _dateOnly(DateTime value) {
     return DateTime(value.year, value.month, value.day);
+  }
+
+  static AndroidNotificationDetails _androidDetailsFor(
+    AppPreferences preferences,
+  ) {
+    final soundKey = preferences.soundEnabled ? 'sound_on' : 'sound_off';
+    final vibrationKey =
+        preferences.vibrationEnabled ? 'vibration_on' : 'vibration_off';
+
+    return AndroidNotificationDetails(
+      'task_reminders_${soundKey}_$vibrationKey',
+      'Task reminders',
+      channelDescription: 'Funny nudges and overdue task reminders',
+      importance: Importance.high,
+      priority: Priority.high,
+      playSound: preferences.soundEnabled,
+      enableVibration: preferences.vibrationEnabled,
+    );
   }
 
   static _NotificationCopy _composeMessage({
