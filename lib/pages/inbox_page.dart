@@ -84,6 +84,7 @@ class _InboxPageState extends State<InboxPage> {
     _blocks = widget.blocks.map(_cloneBlock).toList();
     _syncControllers();
     _draftController.addListener(_handleDraftChanged);
+    _draftFocusNode.addListener(_handleDraftFocusChange);
   }
 
   @override
@@ -100,6 +101,7 @@ class _InboxPageState extends State<InboxPage> {
     _draftController
       ..removeListener(_handleDraftChanged)
       ..dispose();
+    _draftFocusNode.removeListener(_handleDraftFocusChange);
     _draftFocusNode.dispose();
     _scrollController.dispose();
     for (final controller in _controllers.values) {
@@ -150,6 +152,12 @@ class _InboxPageState extends State<InboxPage> {
     }
   }
 
+  void _handleDraftFocusChange() {
+    if (!_draftFocusNode.hasFocus) {
+      _commitDraftIfNeeded();
+    }
+  }
+
   void _updateBlocks(List<InboxBlock> blocks) {
     setState(() {
       _blocks = blocks.map(_cloneBlock).toList();
@@ -159,6 +167,9 @@ class _InboxPageState extends State<InboxPage> {
   }
 
   void _setActiveBlock(String? blockId) {
+    if (_activeBlockId == null && blockId != null) {
+      _commitDraftIfNeeded();
+    }
     if (_activeBlockId == blockId) return;
     setState(() {
       _activeBlockId = blockId;
@@ -189,10 +200,10 @@ class _InboxPageState extends State<InboxPage> {
     _updateBlocks(updatedBlocks);
   }
 
-  void _submitDraftAsTodo() {
+  void _commitDraftIfNeeded() {
     final text = _draftController.text.trim();
     if (text.isEmpty || text.startsWith('/')) return;
-    _insertBlock(type: InboxBlockType.todo, text: text, focusNewBlock: false);
+    _insertBlock(type: InboxBlockType.text, text: text, focusNewBlock: false);
   }
 
   void _insertBlock({
@@ -478,7 +489,7 @@ class _InboxPageState extends State<InboxPage> {
                   _applyCommand(_filteredCommands.first);
                   return;
                 }
-                _submitDraftAsTodo();
+                _commitDraftIfNeeded();
               },
             ),
           ),
@@ -501,105 +512,111 @@ class _InboxPageState extends State<InboxPage> {
     final accentColor =
         widget.isDarkMode ? const Color(0xFFE2B36A) : const Color(0xFFB65C1A);
 
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      appBar: AppBar(
+    return PopScope(
+      onPopInvokedWithResult: (_, __) {
+        _commitDraftIfNeeded();
+      },
+      child: Scaffold(
         backgroundColor: backgroundColor,
-        foregroundColor: textColor,
-        elevation: 0,
-        titleSpacing: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Inbox',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w700,
-                color: textColor,
-              ),
-            ),
-            Text(
-              'Unscheduled work and loose thoughts',
-              style: TextStyle(fontSize: 12, color: subtleTextColor),
-            ),
-          ],
-        ),
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            if (_showCommandMenu)
-              Container(
-                margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                decoration: BoxDecoration(
-                  color: menuColor,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: borderColor),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withAlpha(widget.isDarkMode ? 40 : 14),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
+        appBar: AppBar(
+          backgroundColor: backgroundColor,
+          foregroundColor: textColor,
+          elevation: 0,
+          titleSpacing: 0,
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Inbox',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  color: textColor,
                 ),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 280),
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    itemCount: _filteredCommands.length,
-                    separatorBuilder:
-                        (_, __) => Divider(color: borderColor, height: 1),
-                    itemBuilder: (context, index) {
-                      final command = _filteredCommands[index];
-                      return ListTile(
-                        dense: true,
-                        leading: Icon(command.icon, color: accentColor),
-                        title: Text(
-                          command.title,
-                          style: TextStyle(
-                            color: textColor,
-                            fontWeight: FontWeight.w600,
+              ),
+              Text(
+                'Unscheduled work and loose thoughts',
+                style: TextStyle(fontSize: 12, color: subtleTextColor),
+              ),
+            ],
+          ),
+        ),
+        body: SafeArea(
+          child: Column(
+            children: [
+              if (_showCommandMenu)
+                Container(
+                  margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  decoration: BoxDecoration(
+                    color: menuColor,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: borderColor),
+                    boxShadow: [
+                      BoxShadow(
+                        color:
+                            Colors.black.withAlpha(widget.isDarkMode ? 40 : 14),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 280),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      itemCount: _filteredCommands.length,
+                      separatorBuilder:
+                          (_, __) => Divider(color: borderColor, height: 1),
+                      itemBuilder: (context, index) {
+                        final command = _filteredCommands[index];
+                        return ListTile(
+                          dense: true,
+                          leading: Icon(command.icon, color: accentColor),
+                          title: Text(
+                            command.title,
+                            style: TextStyle(
+                              color: textColor,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                        ),
-                        subtitle: Text(
-                          command.subtitle,
-                          style: TextStyle(color: subtleTextColor),
-                        ),
-                        onTap: () => _applyCommand(command),
+                          subtitle: Text(
+                            command.subtitle,
+                            style: TextStyle(color: subtleTextColor),
+                          ),
+                          onTap: () => _applyCommand(command),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              Expanded(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: () {
+                    _setActiveBlock(null);
+                    _draftFocusNode.requestFocus();
+                  },
+                  child: ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
+                    itemCount: _blocks.length + 1,
+                    itemBuilder: (context, index) {
+                      if (index == _blocks.length) {
+                        return _buildDraftRow(textColor, subtleTextColor);
+                      }
+                      return _buildBlockRow(
+                        _blocks[index],
+                        index,
+                        textColor,
+                        subtleTextColor,
                       );
                     },
                   ),
                 ),
               ),
-            Expanded(
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onTap: () {
-                  _setActiveBlock(null);
-                  _draftFocusNode.requestFocus();
-                },
-                child: ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
-                  itemCount: _blocks.length + 1,
-                  itemBuilder: (context, index) {
-                    if (index == _blocks.length) {
-                      return _buildDraftRow(textColor, subtleTextColor);
-                    }
-                    return _buildBlockRow(
-                      _blocks[index],
-                      index,
-                      textColor,
-                      subtleTextColor,
-                    );
-                  },
-                ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
