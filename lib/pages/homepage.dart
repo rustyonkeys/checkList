@@ -3,6 +3,7 @@ import 'package:checklist/pages/categories.dart';
 import 'package:checklist/pages/inbox_page.dart';
 import 'package:checklist/pages/settings.dart';
 import 'package:checklist/services/local_storage.dart';
+import 'package:checklist/services/notification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:checklist/pages/addtaskpage.dart';
 import 'package:checklist/util/inbox_block.dart';
@@ -18,7 +19,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   List<Task> _tasks = [];
   List<InboxBlock> _inboxBlocks = [];
   List<CategoryItem> _categories = [];
@@ -29,7 +30,21 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadLocalData();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshReminderState();
+    }
   }
 
   Future<void> _loadLocalData() async {
@@ -54,10 +69,13 @@ class _HomePageState extends State<HomePage> {
       _preferences = preferences;
       _isDarkMode = preferences.isDarkMode;
     });
+
+    await _refreshReminderState();
   }
 
   Future<void> _saveTasks() async {
     await LocalStorage.saveTasks(_tasks);
+    await NotificationService.scheduleTaskNudges(_tasks);
   }
 
   Future<void> _saveInboxBlocks() async {
@@ -106,6 +124,69 @@ class _HomePageState extends State<HomePage> {
       DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
 
   DateTime get _tomorrow => _today.add(const Duration(days: 1));
+
+  DateTime _dateOnly(DateTime value) {
+    return DateTime(value.year, value.month, value.day);
+  }
+
+  Future<void> _refreshReminderState() async {
+    await NotificationService.scheduleTaskNudges(_tasks);
+    await _maybeShowYesterdayPrompt();
+    await NotificationService.markAppOpened();
+  }
+
+  Future<void> _maybeShowYesterdayPrompt() async {
+    if (!mounted) return;
+
+    final lastOpenedAt = await NotificationService.getLastOpenedAt();
+    final now = DateTime.now();
+    final yesterday = _today.subtract(const Duration(days: 1));
+    final unfinishedFromYesterday =
+        _tasks
+            .where(
+              (task) => !task.isDone && _dateOnly(task.dueDate) == yesterday,
+            )
+            .toList();
+
+    final reopenedAfterBreak =
+        lastOpenedAt == null ||
+        now.difference(lastOpenedAt).inHours >= 4;
+
+    if (!reopenedAfterBreak || unfinishedFromYesterday.isEmpty) {
+      return;
+    }
+
+    final count = unfinishedFromYesterday.length;
+    final shouldMove = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Missed a few?'),
+            content: Text(
+              'You have $count unfinished ${count == 1 ? 'task' : 'tasks'} from yesterday. Move ${count == 1 ? 'it' : 'them'} to today?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Keep date'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Move to today'),
+              ),
+            ],
+          ),
+    );
+
+    if (shouldMove != true) return;
+
+    setState(() {
+      for (final task in unfinishedFromYesterday) {
+        task.dueDate = _today;
+      }
+    });
+    await _saveTasks();
+  }
 
   void _handleNavigation(int index) {
     setState(() {
@@ -291,11 +372,20 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final sortedTasks = _sortedTasks(_tasks);
-    final todayTasks = sortedTasks.where((t) => t.dueDate == _today).toList();
+    final overdueTasks =
+        sortedTasks
+            .where((t) => !t.isDone && _dateOnly(t.dueDate).isBefore(_today))
+            .toList();
+    final todayTasks =
+        sortedTasks
+            .where((t) => _dateOnly(t.dueDate) == _today)
+            .toList();
     final tomorrowTasks =
-        sortedTasks.where((t) => t.dueDate == _tomorrow).toList();
+        sortedTasks.where((t) => _dateOnly(t.dueDate) == _tomorrow).toList();
     final futureTasks =
-        sortedTasks.where((t) => t.dueDate.isAfter(_tomorrow)).toList();
+        sortedTasks
+            .where((t) => _dateOnly(t.dueDate).isAfter(_tomorrow))
+            .toList();
 
     // Define colors based on theme
     final backgroundColor =
@@ -381,6 +471,20 @@ class _HomePageState extends State<HomePage> {
           ),
           const SizedBox(height: 10),
 
+          if (overdueTasks.isNotEmpty) ...[
+            _sectionTitle("Overdue", textColor, accentColor: Colors.redAccent),
+            ...overdueTasks.map(
+              (task) => _taskTile(
+                task,
+                cardColor,
+                textColor,
+                badgeText: 'Overdue',
+                badgeColor: Colors.redAccent,
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+
           if (futureTasks.isNotEmpty) ...[
             _sectionTitle("Upcoming Tasks", textColor),
             ...futureTasks.map((task) => _taskTile(task, cardColor, textColor)),
@@ -401,6 +505,7 @@ class _HomePageState extends State<HomePage> {
           ],
 
           if (futureTasks.isEmpty &&
+              overdueTasks.isEmpty &&
               todayTasks.isEmpty &&
               tomorrowTasks.isEmpty)
             Center(
@@ -459,21 +564,60 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _sectionTitle(String title, Color textColor) {
+  Widget _sectionTitle(
+    String title,
+    Color textColor, {
+    Color? accentColor,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-          color: textColor,
-        ),
+      child: Row(
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: textColor,
+            ),
+          ),
+          if (accentColor != null) ...[
+            const SizedBox(width: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: accentColor.withAlpha(28),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                'Needs attention',
+                style: TextStyle(
+                  color: accentColor,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
 
-  Widget _taskTile(Task task, Color? cardColor, Color textColor) {
+  String _dateLabel(DateTime value) {
+    final date = _dateOnly(value);
+    if (date == _today) return 'Today';
+    if (date == _tomorrow) return 'Tomorrow';
+    return '${date.day}/${date.month}/${date.year}';
+  }
+
+  Widget _taskTile(
+    Task task,
+    Color? cardColor,
+    Color textColor, {
+    String? badgeText,
+    Color? badgeColor,
+  }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
@@ -482,32 +626,76 @@ class _HomePageState extends State<HomePage> {
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Checkbox(
-            value: task.isDone,
-            activeColor: _isDarkMode ? Colors.white : Colors.black,
-            checkColor: _isDarkMode ? Colors.black : Colors.white,
-            side: BorderSide(
-              color: _isDarkMode ? Colors.grey[600]! : Colors.grey[400]!,
-              width: 2,
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Checkbox(
+              value: task.isDone,
+              activeColor: _isDarkMode ? Colors.white : Colors.black,
+              checkColor: _isDarkMode ? Colors.black : Colors.white,
+              side: BorderSide(
+                color: _isDarkMode ? Colors.grey[600]! : Colors.grey[400]!,
+                width: 2,
+              ),
+              onChanged: (v) async {
+                setState(() {
+                  task.isDone = v!;
+                  task.completedAt = task.isDone ? DateTime.now() : null;
+                });
+                await _saveTasks();
+              },
             ),
-            onChanged: (v) async {
-              setState(() {
-                task.isDone = v!;
-                task.completedAt = task.isDone ? DateTime.now() : null;
-              });
-              await _saveTasks();
-            },
           ),
           Expanded(
-            child: Text(
-              task.title,
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: textColor,
-                decoration: task.isDone ? TextDecoration.lineThrough : null,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        task.title,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: textColor,
+                          decoration:
+                              task.isDone ? TextDecoration.lineThrough : null,
+                        ),
+                      ),
+                    ),
+                    if (badgeText != null && badgeColor != null)
+                      Container(
+                        margin: const EdgeInsets.only(left: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: badgeColor.withAlpha(28),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          badgeText,
+                          style: TextStyle(
+                            color: badgeColor,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  _dateLabel(task.dueDate),
+                  style: TextStyle(
+                    color: _isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           ),
           IconButton(

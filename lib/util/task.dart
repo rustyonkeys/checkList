@@ -6,7 +6,7 @@ class Task {
   final String description;
   String? list;
   final Priority priority;
-  final DateTime dueDate;
+  DateTime dueDate;
   final DateTime createdAt;
   bool isDone;
   DateTime? completedAt;
