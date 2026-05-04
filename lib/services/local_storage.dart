@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:checklist/pages/categories.dart';
+import 'package:checklist/util/inbox_block.dart';
 import 'package:checklist/util/task.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -90,6 +91,7 @@ class LocalStorage {
   static const _tasksKey = 'tasks';
   static const _categoriesKey = 'categories';
   static const _preferencesKey = 'app_preferences';
+  static const _inboxBlocksKey = 'inbox_blocks';
 
   static Future<AppPreferences> loadPreferences() async {
     final prefs = await SharedPreferences.getInstance();
@@ -124,6 +126,23 @@ class LocalStorage {
     final prefs = await SharedPreferences.getInstance();
     final jsonString = json.encode(tasks.map((t) => t.toJson()).toList());
     await prefs.setString(_tasksKey, jsonString);
+  }
+
+  static Future<List<InboxBlock>> loadInboxBlocks() async {
+    final prefs = await SharedPreferences.getInstance();
+    final jsonString = prefs.getString(_inboxBlocksKey);
+    if (jsonString == null || jsonString.isEmpty) return [];
+
+    final List<dynamic> raw = json.decode(jsonString) as List<dynamic>;
+    return raw
+        .map((item) => InboxBlock.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
+  static Future<void> saveInboxBlocks(List<InboxBlock> blocks) async {
+    final prefs = await SharedPreferences.getInstance();
+    final jsonString = json.encode(blocks.map((b) => b.toJson()).toList());
+    await prefs.setString(_inboxBlocksKey, jsonString);
   }
 
   static Future<List<CategoryItem>> loadCategories() async {

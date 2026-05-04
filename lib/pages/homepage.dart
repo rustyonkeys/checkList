@@ -1,9 +1,11 @@
 import 'package:checklist/pages/calendar_page.dart';
 import 'package:checklist/pages/categories.dart';
+import 'package:checklist/pages/inbox_page.dart';
 import 'package:checklist/pages/settings.dart';
 import 'package:checklist/services/local_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:checklist/pages/addtaskpage.dart';
+import 'package:checklist/util/inbox_block.dart';
 import 'package:checklist/util/task.dart';
 
 import '../util/navbar.dart';
@@ -18,6 +20,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   List<Task> _tasks = [];
+  List<InboxBlock> _inboxBlocks = [];
   List<CategoryItem> _categories = [];
   AppPreferences _preferences = AppPreferences.defaults();
   bool _isDarkMode = false;
@@ -31,6 +34,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _loadLocalData() async {
     final tasks = await LocalStorage.loadTasks();
+    final inboxBlocks = await LocalStorage.loadInboxBlocks();
     final categories = await LocalStorage.loadCategories();
     final preferences = await LocalStorage.loadPreferences();
     final filteredTasks =
@@ -45,6 +49,7 @@ class _HomePageState extends State<HomePage> {
 
     setState(() {
       _tasks = filteredTasks;
+      _inboxBlocks = inboxBlocks;
       _categories = categories;
       _preferences = preferences;
       _isDarkMode = preferences.isDarkMode;
@@ -53,6 +58,10 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _saveTasks() async {
     await LocalStorage.saveTasks(_tasks);
+  }
+
+  Future<void> _saveInboxBlocks() async {
+    await LocalStorage.saveInboxBlocks(_inboxBlocks);
   }
 
   Future<void> _saveCategories() async {
@@ -110,6 +119,22 @@ class _HomePageState extends State<HomePage> {
         // Already on home, do nothing
         break;
       case 1:
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder:
+                (_) => InboxPage(
+                  isDarkMode: _isDarkMode,
+                  blocks: _inboxBlocks,
+                  onBlocksChanged: (updatedBlocks) async {
+                    setState(() => _inboxBlocks = List.from(updatedBlocks));
+                    await _saveInboxBlocks();
+                  },
+                ),
+          ),
+        ).then((_) => setState(() => _currentNavIndex = 0));
+        break;
+      case 2:
         // Navigate to Analytics
         Navigator.push(
           context,
@@ -119,16 +144,16 @@ class _HomePageState extends State<HomePage> {
           ),
         ).then((_) => setState(() => _currentNavIndex = 0));
         break;
-      case 2:
+      case 3:
         Navigator.push(
           context,
           MaterialPageRoute(
             builder:
                 (_) => CalendarPage(isDarkMode: _isDarkMode, tasks: _tasks),
           ),
-        ).then((_) => setState(() => _currentNavIndex = 2));
+        ).then((_) => setState(() => _currentNavIndex = 3));
         break;
-      case 3:
+      case 4:
         // Navigate to Categories page
         Navigator.push(
           context,
@@ -149,11 +174,11 @@ class _HomePageState extends State<HomePage> {
                 ),
           ),
         ).then((_) async {
-          setState(() => _currentNavIndex = 3);
+          setState(() => _currentNavIndex = 4);
           await _saveCategories();
         });
         break;
-      case 4:
+      case 5:
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -174,6 +199,11 @@ class _HomePageState extends State<HomePage> {
                     setState(() => _categories = List.from(updatedCategories));
                     _saveCategories();
                   },
+                  inboxBlocks: _inboxBlocks,
+                  onInboxBlocksChanged: (updatedBlocks) {
+                    setState(() => _inboxBlocks = List.from(updatedBlocks));
+                    _saveInboxBlocks();
+                  },
                   tasks: _tasks,
                   onTasksChanged: (updatedTasks) {
                     setState(() => _tasks = List.from(updatedTasks));
@@ -181,7 +211,7 @@ class _HomePageState extends State<HomePage> {
                   },
                 ),
           ),
-        ).then((_) => setState(() => _currentNavIndex = 4));
+        ).then((_) => setState(() => _currentNavIndex = 5));
         break;
     }
   }

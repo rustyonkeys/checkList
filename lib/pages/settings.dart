@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:checklist/pages/categories.dart';
 import 'package:checklist/services/local_storage.dart';
+import 'package:checklist/util/inbox_block.dart';
 import 'package:checklist/util/task.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -13,6 +14,8 @@ class SettingsPage extends StatefulWidget {
   final ValueChanged<AppPreferences> onPreferencesChanged;
   final List<CategoryItem> categories;
   final ValueChanged<List<CategoryItem>> onCategoriesChanged;
+  final List<InboxBlock> inboxBlocks;
+  final ValueChanged<List<InboxBlock>> onInboxBlocksChanged;
   final List<Task> tasks;
   final ValueChanged<List<Task>> onTasksChanged;
 
@@ -24,6 +27,8 @@ class SettingsPage extends StatefulWidget {
     required this.onPreferencesChanged,
     required this.categories,
     required this.onCategoriesChanged,
+    required this.inboxBlocks,
+    required this.onInboxBlocksChanged,
     required this.tasks,
     required this.onTasksChanged,
   });
@@ -266,7 +271,7 @@ class _SettingsPageState extends State<SettingsPage> {
             children: [
               _buildActionTile(
                 title: 'Export Data',
-                subtitle: 'Copy tasks, categories, and preferences as JSON',
+                subtitle: 'Copy tasks, inbox notes, categories, and preferences',
                 icon: Icons.upload_outlined,
                 onTap: _exportData,
                 textColor: textColor,
@@ -278,6 +283,21 @@ class _SettingsPageState extends State<SettingsPage> {
                 subtitle: 'Replace local data from pasted JSON',
                 icon: Icons.download_outlined,
                 onTap: _showImportDialog,
+                textColor: textColor,
+                subtleTextColor: subtleTextColor,
+              ),
+              _buildDivider(borderColor),
+              _buildActionTile(
+                title: 'Clear Inbox',
+                subtitle: 'Remove all unscheduled notes and dumped tasks',
+                icon: Icons.inbox_outlined,
+                iconColor: Colors.orange,
+                onTap:
+                    () => _showDeleteDialog(
+                      'Clear Inbox',
+                      'This will permanently delete every Inbox block.',
+                      _clearInbox,
+                    ),
                 textColor: textColor,
                 subtleTextColor: subtleTextColor,
               ),
@@ -596,6 +616,7 @@ class _SettingsPageState extends State<SettingsPage> {
       'version': 1,
       'exportedAt': DateTime.now().toIso8601String(),
       'tasks': widget.tasks.map((t) => t.toJson()).toList(),
+      'inboxBlocks': widget.inboxBlocks.map((b) => b.toJson()).toList(),
       'categories': widget.categories.map((c) => c.toJson()).toList(),
       'preferences': widget.preferences.toJson(),
     });
@@ -612,6 +633,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 children: [
                   Text(
                     'This export includes ${widget.tasks.length} tasks, '
+                    '${widget.inboxBlocks.length} inbox blocks, '
                     '${widget.categories.length} categories, and app preferences.',
                   ),
                   const SizedBox(height: 12),
@@ -662,7 +684,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const Text(
-                        'Imported data will replace current local tasks, categories, and preferences.',
+                        'Imported data will replace current local tasks, inbox blocks, categories, and preferences.',
                       ),
                       const SizedBox(height: 12),
                       TextField(
@@ -700,15 +722,18 @@ class _SettingsPageState extends State<SettingsPage> {
                         if (!confirmed || !mounted) return;
 
                         widget.onTasksChanged(imported.tasks);
+                        widget.onInboxBlocksChanged(imported.inboxBlocks);
                         widget.onCategoriesChanged(imported.categories);
                         widget.onPreferencesChanged(imported.preferences);
                         navigator.pop();
                         await LocalStorage.saveTasks(imported.tasks);
+                        await LocalStorage.saveInboxBlocks(imported.inboxBlocks);
                         await LocalStorage.saveCategories(imported.categories);
                         await LocalStorage.savePreferences(imported.preferences);
                         if (!mounted) return;
                         _showSnackbar(
-                          'Imported ${imported.tasks.length} tasks and '
+                          'Imported ${imported.tasks.length} tasks, '
+                          '${imported.inboxBlocks.length} inbox blocks, and '
                           '${imported.categories.length} categories',
                         );
                       } catch (_) {
@@ -733,6 +758,7 @@ class _SettingsPageState extends State<SettingsPage> {
       return _ImportedData(
         tasks:
             raw.map((item) => Task.fromJson(item as Map<String, dynamic>)).toList(),
+        inboxBlocks: widget.inboxBlocks,
         categories: widget.categories,
         preferences: widget.preferences,
       );
@@ -740,11 +766,16 @@ class _SettingsPageState extends State<SettingsPage> {
 
     final data = raw as Map<String, dynamic>;
     final tasksRaw = data['tasks'] as List<dynamic>? ?? [];
+    final inboxBlocksRaw = data['inboxBlocks'] as List<dynamic>? ?? [];
     final categoriesRaw = data['categories'] as List<dynamic>? ?? [];
     return _ImportedData(
       tasks:
           tasksRaw
               .map((item) => Task.fromJson(item as Map<String, dynamic>))
+              .toList(),
+      inboxBlocks:
+          inboxBlocksRaw
+              .map((item) => InboxBlock.fromJson(item as Map<String, dynamic>))
               .toList(),
       categories:
           categoriesRaw
@@ -767,8 +798,10 @@ class _SettingsPageState extends State<SettingsPage> {
             title: const Text('Replace Local Data?'),
             content: Text(
               'This will replace your current ${widget.tasks.length} tasks and '
+              '${widget.inboxBlocks.length} inbox blocks and '
               '${widget.categories.length} categories with '
               '${imported.tasks.length} tasks and '
+              '${imported.inboxBlocks.length} inbox blocks and '
               '${imported.categories.length} categories from the import.',
             ),
             actions: [
@@ -794,6 +827,12 @@ class _SettingsPageState extends State<SettingsPage> {
     widget.onTasksChanged(remainingTasks);
     await LocalStorage.saveTasks(remainingTasks);
     _showSnackbar('Completed tasks removed');
+  }
+
+  void _clearInbox() async {
+    widget.onInboxBlocksChanged([]);
+    await LocalStorage.saveInboxBlocks([]);
+    _showSnackbar('Inbox cleared');
   }
 
   void _deleteAllTasks() async {
@@ -855,11 +894,13 @@ class _SettingsPageState extends State<SettingsPage> {
 
 class _ImportedData {
   final List<Task> tasks;
+  final List<InboxBlock> inboxBlocks;
   final List<CategoryItem> categories;
   final AppPreferences preferences;
 
   const _ImportedData({
     required this.tasks,
+    required this.inboxBlocks,
     required this.categories,
     required this.preferences,
   });
