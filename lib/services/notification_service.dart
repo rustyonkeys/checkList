@@ -1,6 +1,7 @@
 import 'package:checklist/services/local_storage.dart';
-import 'package:checklist/util/task.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:checklist/util/task.dart' as app_task;
+import 'package:flutter_local_notifications/flutter_local_notifications.dart'
+    as fln;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
@@ -9,8 +10,8 @@ class NotificationService {
   static const _lastOpenKey = 'last_opened_at';
   static const _nudgeIds = [2001, 2002, 2003];
 
-  static final FlutterLocalNotificationsPlugin _plugin =
-      FlutterLocalNotificationsPlugin();
+  static final fln.FlutterLocalNotificationsPlugin _plugin =
+      fln.FlutterLocalNotificationsPlugin();
 
   static bool _initialized = false;
 
@@ -19,13 +20,15 @@ class NotificationService {
 
     tz.initializeTimeZones();
 
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const initSettings = InitializationSettings(android: androidSettings);
+    const androidSettings = fln.AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
+    const initSettings = fln.InitializationSettings(android: androidSettings);
 
     await _plugin.initialize(initSettings);
     await _plugin
         .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
+          fln.AndroidFlutterLocalNotificationsPlugin
         >()
         ?.requestNotificationsPermission();
 
@@ -45,7 +48,7 @@ class NotificationService {
   }
 
   static Future<void> scheduleTaskNudges(
-    List<Task> tasks,
+    List<app_task.Task> tasks,
     AppPreferences preferences,
   ) async {
     await initialize();
@@ -95,12 +98,12 @@ class NotificationService {
         messages[i].title,
         messages[i].body,
         scheduled,
-        NotificationDetails(
+        fln.NotificationDetails(
           android: _androidDetailsFor(preferences),
         ),
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        androidScheduleMode: fln.AndroidScheduleMode.inexactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
+            fln.UILocalNotificationDateInterpretation.absoluteTime,
       );
     }
   }
@@ -115,19 +118,19 @@ class NotificationService {
     return DateTime(value.year, value.month, value.day);
   }
 
-  static AndroidNotificationDetails _androidDetailsFor(
+  static fln.AndroidNotificationDetails _androidDetailsFor(
     AppPreferences preferences,
   ) {
     final soundKey = preferences.soundEnabled ? 'sound_on' : 'sound_off';
     final vibrationKey =
         preferences.vibrationEnabled ? 'vibration_on' : 'vibration_off';
 
-    return AndroidNotificationDetails(
+    return fln.AndroidNotificationDetails(
       'task_reminders_${soundKey}_$vibrationKey',
       'Task reminders',
       channelDescription: 'Funny nudges and overdue task reminders',
-      importance: Importance.high,
-      priority: Priority.high,
+      importance: fln.Importance.high,
+      priority: fln.Priority.high,
       playSound: preferences.soundEnabled,
       enableVibration: preferences.vibrationEnabled,
     );

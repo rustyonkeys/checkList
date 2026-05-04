@@ -157,6 +157,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       return;
     }
 
+    if (!mounted) return;
     final count = unfinishedFromYesterday.length;
     final shouldMove = await showDialog<bool>(
       context: context,
