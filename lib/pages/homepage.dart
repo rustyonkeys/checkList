@@ -344,6 +344,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     await _saveTasks();
   }
 
+  Future<void> _toggleTaskDone(Task task, bool value) async {
+    setState(() {
+      task.isDone = value;
+      task.completedAt = value ? DateTime.now() : null;
+    });
+    await _saveTasks();
+  }
+
   void _showTaskDeleteDialog(Task task) {
     showDialog(
       context: context,
@@ -606,11 +614,211 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
   }
 
+  Color _priorityColor(Priority priority) {
+    switch (priority) {
+      case Priority.high:
+        return Colors.redAccent;
+      case Priority.medium:
+        return Colors.orangeAccent;
+      case Priority.low:
+        return Colors.green;
+    }
+  }
+
+  String _priorityLabel(Priority priority) {
+    switch (priority) {
+      case Priority.high:
+        return 'High';
+      case Priority.medium:
+        return 'Medium';
+      case Priority.low:
+        return 'Low';
+    }
+  }
+
+  void _showTaskDetails(Task task, {String? badgeText, Color? badgeColor}) {
+    final sheetBackground =
+        _isDarkMode ? const Color(0xFF222222) : Colors.white;
+    final sheetText = _isDarkMode ? Colors.white : Colors.black;
+    final sheetSubtle =
+        _isDarkMode ? Colors.grey[400]! : Colors.grey[600]!;
+    final dividerColor =
+        _isDarkMode ? const Color(0xFF363636) : const Color(0xFFEAEAEA);
+    final priorityColor = _priorityColor(task.priority);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: sheetBackground,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        final sheetNavigator = Navigator.of(sheetContext);
+        return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 42,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: dividerColor,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Checkbox(
+                        value: task.isDone,
+                        activeColor: _isDarkMode ? Colors.white : Colors.black,
+                        checkColor: _isDarkMode ? Colors.black : Colors.white,
+                        onChanged: (value) async {
+                          await _toggleTaskDone(task, value ?? false);
+                          if (!mounted) return;
+                          sheetNavigator.pop();
+                        },
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              task.title,
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w700,
+                                color: sheetText,
+                                decoration:
+                                    task.isDone
+                                        ? TextDecoration.lineThrough
+                                        : null,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                _detailChip(
+                                  label: _dateLabel(task.dueDate),
+                                  color: Colors.blueAccent,
+                                ),
+                                _detailChip(
+                                  label: _priorityLabel(task.priority),
+                                  color: priorityColor,
+                                ),
+                                if (task.list != null && task.list!.isNotEmpty)
+                                  _detailChip(
+                                    label: task.list!,
+                                    color: Colors.purple,
+                                  ),
+                                if (badgeText != null && badgeColor != null)
+                                  _detailChip(
+                                    label: badgeText,
+                                    color: badgeColor,
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    'Description',
+                    style: TextStyle(
+                      color: sheetSubtle,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    task.description.trim().isEmpty
+                        ? 'No description added.'
+                        : task.description,
+                    style: TextStyle(
+                      color: sheetText,
+                      fontSize: 16,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            Navigator.pop(sheetContext);
+                            await _editTask(task);
+                          },
+                          icon: const Icon(Icons.edit_outlined),
+                          label: const Text('Edit'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: sheetText,
+                            side: BorderSide(color: dividerColor),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: () {
+                            Navigator.pop(sheetContext);
+                            _showTaskDeleteDialog(task);
+                          },
+                          icon: const Icon(Icons.delete_outline),
+                          label: const Text('Delete'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.redAccent,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+      },
+    );
+  }
+
   String _dateLabel(DateTime value) {
     final date = _dateOnly(value);
     if (date == _today) return 'Today';
     if (date == _tomorrow) return 'Tomorrow';
     return '${date.day}/${date.month}/${date.year}';
+  }
+
+  Widget _detailChip({required String label, required Color color}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withAlpha(24),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
   }
 
   Widget _taskTile(
@@ -620,97 +828,105 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     String? badgeText,
     Color? badgeColor,
   }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(16),
+    return InkWell(
+      onTap: () => _showTaskDetails(
+        task,
+        badgeText: badgeText,
+        badgeColor: badgeColor,
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Checkbox(
-              value: task.isDone,
-              activeColor: _isDarkMode ? Colors.white : Colors.black,
-              checkColor: _isDarkMode ? Colors.black : Colors.white,
-              side: BorderSide(
-                color: _isDarkMode ? Colors.grey[600]! : Colors.grey[400]!,
-                width: 2,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Checkbox(
+                value: task.isDone,
+                activeColor: _isDarkMode ? Colors.white : Colors.black,
+                checkColor: _isDarkMode ? Colors.black : Colors.white,
+                side: BorderSide(
+                  color: _isDarkMode ? Colors.grey[600]! : Colors.grey[400]!,
+                  width: 2,
+                ),
+                onChanged: (v) async {
+                  await _toggleTaskDone(task, v ?? false);
+                },
               ),
-              onChanged: (v) async {
-                setState(() {
-                  task.isDone = v!;
-                  task.completedAt = task.isDone ? DateTime.now() : null;
-                });
-                await _saveTasks();
-              },
             ),
-          ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        task.title,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: textColor,
-                          decoration:
-                              task.isDone ? TextDecoration.lineThrough : null,
-                        ),
-                      ),
-                    ),
-                    if (badgeText != null && badgeColor != null)
-                      Container(
-                        margin: const EdgeInsets.only(left: 8),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: badgeColor.withAlpha(28),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
                         child: Text(
-                          badgeText,
+                          task.title,
                           style: TextStyle(
-                            color: badgeColor,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: FontWeight.w600,
+                            color: textColor,
+                            decoration:
+                                task.isDone ? TextDecoration.lineThrough : null,
                           ),
                         ),
                       ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  _dateLabel(task.dueDate),
-                  style: TextStyle(
-                    color: _isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+                      if (badgeText != null && badgeColor != null)
+                        Container(
+                          margin: const EdgeInsets.only(left: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: badgeColor.withAlpha(28),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            badgeText,
+                            style: TextStyle(
+                              color: badgeColor,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: 6),
+                  Text(
+                    _dateLabel(task.dueDate),
+                    style: TextStyle(
+                      color: _isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          IconButton(
-            icon: Icon(Icons.edit, color: textColor, size: 20),
-            onPressed: () => _editTask(task),
-            tooltip: 'Edit task',
-          ),
-          IconButton(
-            icon: Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
-            onPressed: () => _showTaskDeleteDialog(task),
-            tooltip: 'Delete task',
-          ),
-        ],
+            IconButton(
+              icon: Icon(Icons.edit, color: textColor, size: 20),
+              onPressed: () => _editTask(task),
+              tooltip: 'Edit task',
+            ),
+            IconButton(
+              icon: Icon(
+                Icons.delete_outline,
+                color: Colors.redAccent,
+                size: 20,
+              ),
+              onPressed: () => _showTaskDeleteDialog(task),
+              tooltip: 'Delete task',
+            ),
+          ],
+        ),
       ),
     );
   }
