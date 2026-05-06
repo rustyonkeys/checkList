@@ -2,6 +2,7 @@ import 'package:checklist/services/local_storage.dart';
 import 'package:checklist/util/task.dart' as app_task;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart'
     as fln;
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
@@ -19,6 +20,8 @@ class NotificationService {
     if (_initialized) return;
 
     tz.initializeTimeZones();
+    final timezoneName = await FlutterTimezone.getLocalTimezone();
+    tz.setLocalLocation(tz.getLocation(timezoneName));
 
     const androidSettings = fln.AndroidInitializationSettings(
       '@mipmap/ic_launcher',
@@ -112,6 +115,27 @@ class NotificationService {
     for (final id in _nudgeIds) {
       await _plugin.cancel(id);
     }
+  }
+
+  static Future<void> showTestNotification(
+    AppPreferences preferences,
+  ) async {
+    await initialize();
+
+    if (!preferences.notificationsEnabled) return;
+
+    await _plugin.show(
+      3001,
+      'checkList test ping',
+      'If you can see this, local notifications are alive and kicking.',
+      fln.NotificationDetails(android: _androidDetailsFor(preferences)),
+    );
+  }
+
+  static Future<int> pendingReminderCount() async {
+    await initialize();
+    final requests = await _plugin.pendingNotificationRequests();
+    return requests.where((request) => _nudgeIds.contains(request.id)).length;
   }
 
   static DateTime _dateOnly(DateTime value) {

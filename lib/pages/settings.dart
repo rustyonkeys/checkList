@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:checklist/pages/categories.dart';
 import 'package:checklist/services/local_storage.dart';
+import 'package:checklist/services/notification_service.dart';
 import 'package:checklist/util/inbox_block.dart';
 import 'package:checklist/util/task.dart';
 
@@ -172,6 +173,49 @@ class _SettingsPageState extends State<SettingsPage> {
                       _updatePreferences();
                     }),
                 enabled: _notificationsEnabled,
+                textColor: textColor,
+                subtleTextColor: subtleTextColor,
+              ),
+              _buildDivider(borderColor),
+              _buildActionTile(
+                title: 'Send Test Notification',
+                subtitle: 'Fire one instantly to verify phone delivery',
+                icon: Icons.notifications_active_outlined,
+                onTap: () async {
+                  if (!_notificationsEnabled) {
+                    _showSnackbar(
+                      'Enable notifications in Settings first.',
+                    );
+                    return;
+                  }
+                  await NotificationService.showTestNotification(
+                    widget.preferences.copyWith(
+                      notificationsEnabled: _notificationsEnabled,
+                      soundEnabled: _soundEnabled,
+                      vibrationEnabled: _vibrationEnabled,
+                    ),
+                  );
+                  if (!mounted) return;
+                  _showSnackbar('Test notification sent');
+                },
+                textColor: textColor,
+                subtleTextColor: subtleTextColor,
+              ),
+              _buildDivider(borderColor),
+              _buildActionTile(
+                title: 'Reminder Status',
+                subtitle: 'See how many task reminders are queued',
+                icon: Icons.schedule_outlined,
+                onTap: () async {
+                  final count =
+                      await NotificationService.pendingReminderCount();
+                  if (!mounted) return;
+                  _showSnackbar(
+                    count == 0
+                        ? 'No reminder notifications are queued right now.'
+                        : '$count reminder notifications are queued.',
+                  );
+                },
                 textColor: textColor,
                 subtleTextColor: subtleTextColor,
               ),
